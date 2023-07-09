@@ -1,7 +1,6 @@
 % download data from Madrigal
 
-url = 'http://cedar.openmadrigal.org';
-% must be char due to outdated Madrigal API code
+url = "http://cedar.openmadrigal.org";
 
 username = "Steven+Cheng";
 email = "stcheng@bu.edu";

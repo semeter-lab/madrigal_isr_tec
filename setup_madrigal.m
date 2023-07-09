@@ -1,10 +1,7 @@
 % download patched madrigal API, extracting under this directory.
 
 cwd = fileparts(mfilename("fullpath"));
-mad_dir = fullfile(cwd, "matlab-madrigal-main");
-
-mad_archive = "remoteMatlabAPI.zip";
-url = "https://github.com/semeter-lab/matlab-madrigal/archive/refs/heads/main.zip";
+mad_dir = fullfile(cwd, "madmatlab");
 
 if isfile(fullfile(mad_dir, "globalIsprint.m"))
   disp(mad_dir)
@@ -12,13 +9,4 @@ if isfile(fullfile(mad_dir, "globalIsprint.m"))
   return
 end
 
-if ~isfile(mad_archive)
-  disp(url + " => " + mad_archive)
-  websave(mad_archive, url);
-end
-
-disp(mad_archive + " => " + mad_dir)
-unzip(mad_archive, cwd)
-
-addpath(mad_dir)
-disp(mad_dir)
+error("please type in Terminal (not Matlab)\ngit -C %s submodule init --update", cwd)
