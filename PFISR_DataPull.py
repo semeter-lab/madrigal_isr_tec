@@ -15,7 +15,7 @@ username = "Steven+Cheng"
 email = "stcheng@bu.edu"
 org = "'Boston+University'"
 
-parms = "gdalt,elm,f10.7,nel,dnel"
+parms = "ut1_unix,gdalt,elm,f10.7,nel,dnel"
 data_dir = Path("~/data_gnss_py").expanduser()
 t0 = datetime(2021, 1, 1, 0, 0, 0)
 t1 = datetime(2022, 12, 31, 0, 0, 0)
