@@ -8,8 +8,8 @@ org = "'Boston+University'";
 
 parms = "UT1_UNIX,GDALT,ELM,F10.7,NEL,DNEL";
 data_dir = "~/data_gnss";
-t0 = datetime(2023, 12, 1, 0, 0, 0);
-t1 = datetime(2023, 12, 31, 0, 0, 0);
+t0 = datetime(2020, 12, 1, 0, 0, 0);
+t1 = datetime(2022, 12, 31, 0, 0, 0);
 inst_code = 61;
 format = "Hdf5";
 filter = "filter=GDALT,80,500";
