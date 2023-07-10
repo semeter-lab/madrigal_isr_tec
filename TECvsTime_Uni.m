@@ -1,50 +1,66 @@
 % Universial TECvsTime function
 
-%Takes parameter dataset, char vector of name of text file to analyze.
-%Dataset must have the following columns, matching the column number:
-%Col 1: NEL, Col 3: GDALT, Col 4: UT1_UNIX
-%Make sure dataset is in directory
+function TECvsTime_Uni(data_file)
+arguments
+  data_file (1,1) string {mustBeFile}
+end
 
+%% load entire data file, can take large amount of RAM
+% a priori knownledge of how Madrigal lays out HDF5 groups / datasets
+compound_ds = "/Data/Table Layout";
 
-function TECvsTime_Uni(dataset)
+% Matlab h5read only reads entire compound dataset.
+% Python as h5py trivially reads invididual fields of compound
+% dataset for a large saving in time and memory
+tic
+raw = h5read(data_file, compound_ds);
 
-unsortedT = readtable(dataset);
-T = sortrows(unsortedT, 4); %sort based on time
-clear unsortedT
+T.time = datetime(1970, 1, 1, 0, 0, 0) + seconds(raw.ut1_unix);
+T.gdalt = raw.gdalt;
+T.nel = raw.nel;
+
+clear('raw')
+T = struct2table(T);
+%% sorting
+T = sortrows(T, "time");
 Trows = height(T);
+disp("Loaded and sorted data in " + num2str(toc, "%.1f") + " seconds.")
 
-% count number of valid rows of NEL and create array of
-% each time value
+disp('count number of valid rows of NEL and create array of each time value')
+tic
 NELrows = 0;
 profTimes = [];
 timesCnt = 0;
 
 for i = 1:Trows
-    if ~isequaln(T.Var1(i), NaN) && ~isequaln(T.Var1(i), 0) && ~isequaln(T.Var4(i), 0) && ~isequaln(T.Var4(i), NaN)  %if valid NEL and time value
+    if ~isequaln(T.nel(i), NaN) && ~isequaln(T.nel(i), 0) && ~isequaln(T.time(i), 0) && ~isequaln(T.time(i), NaN)  %if valid NEL and time value
         NELrows = NELrows + 1;
 
-        if isempty(profTimes) || (~isequaln(T.Var4(i), profTimes(timesCnt)))
-            profTimes = cat(1,profTimes,T.Var4(i));
+        if isempty(profTimes) || (~isequaln(T.time(i), profTimes(timesCnt)))
+            profTimes = cat(1,profTimes,T.time(i));
             timesCnt = timesCnt + 1;
 
         end
     end
+    if ~mod(i, 1000)
+        disp("counting valid NEL rows " + num2str(i/Trows*100, "%.1f") + " %")
+    end
 end
+disp("Done counting valid NEL rows in " + num2str(toc, " seconds."))
 
-% create array of number of NEL values at each
-% specific time, numTimes
+disp('create array of number of NEL values at each specific time, numTimes')
 numTimes = [];
 numNELatTime = 0;
 thisTime = 1;
-for i = 1:length(T.Var4)
-    if T.Var4(i) == profTimes(thisTime)  %%equal to current time
-       if ~isequaln(T.Var1(i), NaN) && ~isequaln(T.Var1(i), 0)
+for i = 1:length(T.time)
+    if T.time(i) == profTimes(thisTime)  %%equal to current time
+       if ~isequaln(T.nel(i), NaN) && ~isequaln(T.nel(i), 0)
            numNELatTime = numNELatTime + 1;
        end
-    elseif ~isequaln(T.Var4(i), 0) && ~isequaln(T.Var4(i), NaN)  %%equal to next time
+    elseif ~isequaln(T.time(i), 0) && ~isequaln(T.time(i), NaN)  %%equal to next time
         numTimes = cat(1,numTimes,numNELatTime);
         thisTime = thisTime + 1;
-        if ~isequaln(T.Var1(i), NaN) && ~isequaln(T.Var1(i), 0)
+        if ~isequaln(T.nel(i), NaN) && ~isequaln(T.nel(i), 0)
             numNELatTime = 1;
         else
             numNELatTime = 0;
@@ -60,27 +76,35 @@ GDALT = zeros(NELrows, 1);
 % fill arrays of zeros with valid NEL values
 % and corresponding GDALT values
 NELcnt = 1;
-
+disp("finding rows with good data")
+tic
 for i = 1:Trows
-    if ~isequaln(T.Var1(i), NaN) && ~isequaln(T.Var1(i), 0) && ~isequaln(T.Var3(i), NaN) && ~isequaln(T.Var3(i), 0)
-        NEL(NELcnt) = T.Var1(i);
-        GDALT(NELcnt) = T.Var3(i);
+    if ~isequaln(T.nel(i), NaN) && ~isequaln(T.nel(i), 0) && ~isequaln(T.gdalt(i), NaN) && ~isequaln(T.gdalt(i), 0)
+        NEL(NELcnt) = T.nel(i);
+        GDALT(NELcnt) = T.gdalt(i);
         NELcnt = NELcnt + 1;
     end
 end
+disp("Done finding good rows in " + num2str(toc, "%.1f") + " seconds.")
 
 % Reverse the log_10 for NE
 NE = 10 .^ NEL;
 
-TEC = zeros(length(numTimes), 1);
-chapParams = zeros(length(numTimes),3);
+Nt = length(numTimes);
+
+TEC = zeros(Nt, 1);
+chapParams = zeros(Nt, 3);
 z = 100:10:500;
 H = 50;
 segBegin = 1;
-profSegs = zeros(length(numTimes),2);
+profSegs = zeros(Nt, 2);
 profSegs(1,1) = segBegin;
+
+disp("Integrating profiles")
+
 % For EACH PROFILE, integrate GDALT vs. NE for TEC values
-for i = 1:length(numTimes)
+tic
+for i = 1:Nt
     if numTimes(i) ~= 1
         segEnd = segBegin + numTimes(i) - 1;
         profSegs(i,2) = segEnd;
@@ -141,19 +165,14 @@ for i = 1:length(numTimes)
     end
     segBegin = segBegin + numTimes(i);
     profSegs(i+1,1) = segBegin;
+    disp("Integrating " + num2str(i/Nt*100, "%.1f") + " %")
 end
+
+disp("Integration took " + num2str(toc, "%.1f") + " seconds.")
 
 %find Chapman fit outliers in the profiles
-[outliers,whereOutliers] = chapOutliers(chapParams);
+% [outliers,whereOutliers] = chapOutliers(chapParams);
 sond_mmTEC = movmean(TEC, 250);
-
-% convert unix time to universal time
-date = strings(length(profTimes), 1);
-for i = 1:length(date)
-     date(i) = datestr(profTimes(i)/86400 + datenum(1970,1,1), 'dd-mmm-yyyy HH:MM:SS');
-end
-% convert date to numerical value for matlab plotting
-sond_plotDate = datenum(date);
 
 %Side-by-side display of profile
 figure
@@ -164,7 +183,7 @@ sideProfPts = scatter(0,0);
 %showProfileFcn generates profile of point clicked on TEC graph
 figure
 sondFig = gcf;
-sondrestromPlot = plot(sond_plotDate, sond_mmTEC);
+sondrestromPlot = plot(profTimes, sond_mmTEC);
 
 set(sondrestromPlot,'HitTest','off')
 set(gca,'ButtonDownFcn',{@showProfileFcn, profTimes, profSegs, GDALT,...
@@ -185,7 +204,7 @@ vert = xline(sond_plotDate(1),'LineStyle',"--",'HitTest','off');
 %set(sondFig, 'WindowButtonMotionFcn', {@hoverShowProf, sideProfile, sond_plotDate, date, profSegs,...
 %    GDALT, NE})
 set(sondFig, 'WindowButtonMotionFcn', {@hover, sideProfile, sideProfPts, profSegs, GDALT, NE,...
-    t, pnt, vert, date, sond_plotDate, sond_mmTEC})
+    t, pnt, vert, profTimes, sond_plotDate, sond_mmTEC})
 
 
 
